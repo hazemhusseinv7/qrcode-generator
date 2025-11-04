@@ -68,37 +68,6 @@ function QRContent() {
   }, [dataKey]);
 
   /**
-   * Text wrapping utility for canvas rendering
-   * Breaks long URLs into multiple lines for better readability
-   * @param ctx - Canvas 2D rendering context
-   * @param text - Text content to wrap
-   * @param maxWidth - Maximum width in pixels for text wrapping
-   * @returns Array of text lines
-   */
-  const wrapText = (
-    ctx: CanvasRenderingContext2D,
-    text: string,
-    maxWidth: number
-  ): string[] => {
-    const words = text.split("");
-    const lines = [];
-    let currentLine = words[0];
-
-    for (let i = 1; i < words.length; i++) {
-      const word = words[i];
-      const width = ctx.measureText(currentLine + word).width;
-      if (width < maxWidth) {
-        currentLine += word;
-      } else {
-        lines.push(currentLine);
-        currentLine = word;
-      }
-    }
-    lines.push(currentLine);
-    return lines;
-  };
-
-  /**
    * PNG image download handler
    * Generates high-quality canvas and triggers browser download
    */
@@ -305,6 +274,29 @@ function QRContent() {
   };
 
   /**
+   * Loads a font for canvas rendering with fallback support
+   * @param ctx - Canvas rendering context
+   * @param fontSize - Desired font size
+   * @param fontWeight - Font weight (normal, bold, etc.)
+   */
+  const setCanvasFont = (
+    ctx: CanvasRenderingContext2D,
+    fontSize: number,
+    fontWeight: string = "normal"
+  ) => {
+    // Font stack with Arabic-supporting fonts and fallbacks
+    const fontStack = [
+      "Tajawal",
+      "Segoe UI",
+      "Tahoma",
+      "Arial",
+      "sans-serif",
+    ].join(", ");
+
+    ctx.font = `${fontWeight} ${fontSize}px ${fontStack}`;
+  };
+
+  /**
    * Main canvas generation function for high-quality output
    * Composes all elements (office info, QR codes, text) into a single canvas
    * @returns Promise resolving to HTMLCanvasElement
@@ -363,58 +355,57 @@ function QRContent() {
 
         // Add office name if available
         if (qrData.officeName) {
-          ctx.font = "bold 32px Arial";
+          setCanvasFont(ctx, 32, "bold");
           ctx.fillText("المكتب الوسيط", width / 2, currentY);
           currentY += 40;
-          ctx.font = "28px Arial";
+          setCanvasFont(ctx, 28, "normal");
           ctx.fillText(qrData.officeName, width / 2, currentY);
           currentY += 80;
         }
       }
 
       // Create main QR code for property details
-      const mainQRImg = await createQRCodeImage(qrData.details, 400, true);
+      const mainQRSize = Math.floor(width * 0.75);
+      const mainQRImg = await createQRCodeImage(
+        qrData.details,
+        mainQRSize,
+        true
+      );
 
-      ctx.drawImage(mainQRImg, width / 2 - 200, currentY, 400, 400);
-      currentY += 450;
+      ctx.drawImage(
+        mainQRImg,
+        width / 2 - mainQRSize / 2,
+        currentY,
+        mainQRSize,
+        mainQRSize
+      );
+      currentY += mainQRSize + 50;
 
       // Add main QR title
-      ctx.font = "bold 32px Arial";
+      setCanvasFont(ctx, 32, "bold");
       ctx.fillText("تفاصيل العقار ومالك العقار", width / 2, currentY);
-      currentY += 50;
+      currentY += 80;
 
-      // Add main QR URL with text wrapping
-      ctx.font = "20px Arial";
-      const urlLines = wrapText(ctx, qrData.details, width - 100);
-      urlLines.forEach((line: string) => {
-        ctx.fillText(line, width / 2, currentY);
-        currentY += 30;
-      });
-
-      currentY += 50;
+      currentY += 30;
 
       // Create license section background
+      const licenseSectionHeight = 200;
+      const licenseSectionY = currentY;
       ctx.fillStyle = "#f8f9fa";
-      ctx.fillRect(50, currentY, width - 100, 300);
+      ctx.fillRect(50, licenseSectionY, width - 100, licenseSectionHeight);
       ctx.fillStyle = "#000000";
 
-      currentY += 80;
+      const licenseCenterY = licenseSectionY + licenseSectionHeight / 2;
 
       // Create license QR code
       const licenseQRImg = await createQRCodeImage(qrData.license, 150, false);
 
-      ctx.drawImage(licenseQRImg, 150, currentY - 75, 150, 150);
+      ctx.drawImage(licenseQRImg, 150, licenseCenterY - 75, 150, 150);
 
       // Add license text
-      ctx.font = "bold 28px Arial";
+      setCanvasFont(ctx, 28, "bold");
       ctx.textAlign = "right";
-      ctx.fillText("رخصة الإعلان من هيئة العقار", width - 150, currentY - 30);
-
-      ctx.font = "18px Arial";
-      const licenseUrlLines = wrapText(ctx, qrData.license, 400);
-      licenseUrlLines.forEach((line: string, index: number) => {
-        ctx.fillText(line, width - 150, currentY + 30 + index * 25);
-      });
+      ctx.fillText("رخصة الإعلان من هيئة العقار", width - 150, licenseCenterY);
 
       return canvas;
     } catch (error) {
