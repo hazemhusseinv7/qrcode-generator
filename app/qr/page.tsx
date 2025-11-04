@@ -179,7 +179,8 @@ function QRContent() {
    */
   const createQRCodeImage = async (
     value: string,
-    size: number
+    size: number,
+    showLogo: boolean = true // Add this parameter with default value
   ): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
       try {
@@ -200,10 +201,8 @@ function QRContent() {
               return;
             }
 
-            // Now add the center logo to the QR code
             const qrImg = new Image();
             qrImg.onload = () => {
-              // Create a canvas to composite QR code + logo
               const canvas = document.createElement("canvas");
               canvas.width = size;
               canvas.height = size;
@@ -212,48 +211,76 @@ function QRContent() {
               // Draw QR code as base layer
               ctx.drawImage(qrImg, 0, 0, size, size);
 
-              // Calculate logo container dimensions (matching the HTML layout)
-              const logoContainerSize = size / 5;
-              const centerX = size / 2;
-              const centerY = size / 2;
+              // Only add logo if showLogo is true
+              if (showLogo) {
+                // Calculate logo container dimensions
+                const logoContainerSize = size / 5;
+                const centerX = size / 2;
+                const centerY = size / 2;
 
-              // Create the white background with rounded corners (like "bg-white rounded-lg")
-              const borderRadius = logoContainerSize * 0.2; // 20% of container size for rounded corners
-              ctx.fillStyle = "#FFFFFF";
+                // Create the white background with rounded corners
+                const borderRadius = logoContainerSize * 0.2;
+                ctx.fillStyle = "#FFFFFF";
 
-              // Draw rounded rectangle for background (no border)
-              ctx.beginPath();
-              ctx.roundRect(
-                centerX - logoContainerSize / 2,
-                centerY - logoContainerSize / 2,
-                logoContainerSize,
-                logoContainerSize,
-                borderRadius
-              );
-              ctx.fill();
-
-              // Add padding (like "p-1" - 0.25rem which is ~4px, scaled proportionally)
-              const padding = logoContainerSize * 0.08; // 8% padding
-              const logoAreaSize = logoContainerSize - padding * 2;
-
-              // Now load and draw the actual logo icon
-              const logoImg = new Image();
-              logoImg.crossOrigin = "anonymous";
-              logoImg.onload = () => {
-                // Calculate logo position with padding
-                const logoX = centerX - logoAreaSize / 2;
-                const logoY = centerY - logoAreaSize / 2;
-
-                // Draw the logo with proper padding
-                ctx.drawImage(
-                  logoImg,
-                  logoX,
-                  logoY,
-                  logoAreaSize,
-                  logoAreaSize
+                // Draw rounded rectangle for background
+                ctx.beginPath();
+                ctx.roundRect(
+                  centerX - logoContainerSize / 2,
+                  centerY - logoContainerSize / 2,
+                  logoContainerSize,
+                  logoContainerSize,
+                  borderRadius
                 );
+                ctx.fill();
 
-                // Convert back to image
+                // Add padding
+                const padding = logoContainerSize * 0.08;
+                const logoAreaSize = logoContainerSize - padding * 2;
+
+                // Now load and draw the actual logo icon
+                const logoImg = new Image();
+                logoImg.crossOrigin = "anonymous";
+                logoImg.onload = () => {
+                  // Calculate logo position with padding
+                  const logoX = centerX - logoAreaSize / 2;
+                  const logoY = centerY - logoAreaSize / 2;
+
+                  // Draw the logo with proper padding
+                  ctx.drawImage(
+                    logoImg,
+                    logoX,
+                    logoY,
+                    logoAreaSize,
+                    logoAreaSize
+                  );
+
+                  // Convert back to image
+                  const finalImg = new Image();
+                  finalImg.onload = () => {
+                    resolve(finalImg);
+                  };
+                  finalImg.onerror = () => {
+                    reject(new Error("Failed to create QR code image"));
+                  };
+                  finalImg.src = canvas.toDataURL();
+                };
+
+                logoImg.onerror = () => {
+                  // If logo fails to load, just use the QR code without logo
+                  const finalImg = new Image();
+                  finalImg.onload = () => {
+                    resolve(finalImg);
+                  };
+                  finalImg.onerror = () => {
+                    reject(new Error("Failed to create QR code image"));
+                  };
+                  finalImg.src = canvas.toDataURL();
+                };
+
+                // Try to load the logo from the same path as used in the display
+                logoImg.src = "/logo/logo.png";
+              } else {
+                // If no logo needed, just return the QR code as is
                 const finalImg = new Image();
                 finalImg.onload = () => {
                   resolve(finalImg);
@@ -262,22 +289,7 @@ function QRContent() {
                   reject(new Error("Failed to create QR code image"));
                 };
                 finalImg.src = canvas.toDataURL();
-              };
-
-              logoImg.onerror = () => {
-                // If logo fails to load, just use the styled container without logo
-                const finalImg = new Image();
-                finalImg.onload = () => {
-                  resolve(finalImg);
-                };
-                finalImg.onerror = () => {
-                  reject(new Error("Failed to create QR code image"));
-                };
-                finalImg.src = canvas.toDataURL();
-              };
-
-              // Try to load the logo from the same path as used in the display
-              logoImg.src = "/logo/logo.png";
+              }
             };
 
             qrImg.onerror = () => {
@@ -361,7 +373,7 @@ function QRContent() {
       }
 
       // Create main QR code for property details
-      const mainQRImg = await createQRCodeImage(qrData.details, 400);
+      const mainQRImg = await createQRCodeImage(qrData.details, 400, true);
 
       ctx.drawImage(mainQRImg, width / 2 - 200, currentY, 400, 400);
       currentY += 450;
@@ -389,7 +401,7 @@ function QRContent() {
       currentY += 80;
 
       // Create license QR code
-      const licenseQRImg = await createQRCodeImage(qrData.license, 150);
+      const licenseQRImg = await createQRCodeImage(qrData.license, 150, false);
 
       ctx.drawImage(licenseQRImg, 150, currentY - 75, 150, 150);
 
@@ -414,7 +426,15 @@ function QRContent() {
    * Custom QR code component with centered logo overlay
    * Used for display purposes in the UI
    */
-  const CustomQRCode = ({ value, size }: { value: string; size: number }) => (
+  const CustomQRCode = ({
+    value,
+    size,
+    showLogo = true,
+  }: {
+    value: string;
+    size: number;
+    showLogo?: boolean;
+  }) => (
     <div className="relative inline-block rounded-md overflow-hidden">
       <QRCodeSVG
         value={value}
@@ -424,22 +444,24 @@ function QRContent() {
         bgColor="#FFFFFF"
         fgColor="#000000"
       />
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-        <div className="bg-white p-1 rounded-lg border">
-          <img
-            src="/logo/logo.png"
-            alt="Logo"
-            width={24}
-            height={24}
-            className="size-6 object-contain"
-            crossOrigin="anonymous"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = "none";
-            }}
-          />
+      {showLogo && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <div className="bg-white p-1 rounded-lg border">
+            <img
+              src="/logo/logo.png"
+              alt="Logo"
+              width={24}
+              height={24}
+              className="size-6 object-contain"
+              crossOrigin="anonymous"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = "none";
+              }}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 
@@ -567,6 +589,7 @@ function QRContent() {
                             ? 120
                             : 180
                         }
+                        showLogo={true}
                       />
                     </div>
                   </div>
@@ -604,6 +627,7 @@ function QRContent() {
                               ? 50
                               : 70
                           }
+                          showLogo={false}
                         />
                       </div>
                       <div className="space-y-1 sm:space-y-2 flex-1 min-w-0">
